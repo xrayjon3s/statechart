@@ -1,0 +1,3 @@
+- Make as many methods as possible private to prevent API misuse
+- clang format with Google style (and set this up as default in the project, and commit any settings?)
+- remove none() - that was needed only when enter/exit were events, not separate functions, in an earlier version

@@ -1,0 +1,9 @@
+# Copyright (c) 2026 Chris Leger
+# Licensed under the MIT License
+
+# Based on Google C++ Style Guide
+# https://google.github.io/styleguide/cppguide.html
+
+BasedOnStyle: Google
+IndentWidth: 2
+ColumnLimit: 80
