@@ -193,8 +193,11 @@ Overloaded(Ts...) -> Overloaded<Ts...>;
     /* name() - Returns the state name as a C-string */                   \
     const char* name() const override { return #Name; }                   \
                                                                            \
-    /* Depth() - Returns depth in hierarchy (parent depth + 1) */          \
-    int Depth() const override { return Parent::Depth() + 1; }            \
+    /* Depth() - Returns depth in hierarchy (computed once) */                   \
+    int Depth() const override {                                             \
+      static int d = Parent::Depth() + 1;                                     \
+      return d;                                                              \
+    }            \
                                                                            \
     /* ParentState() - Returns pointer to parent state */                   \
     HSM::Base* ParentState() const override { return Parent::make(); }     \
