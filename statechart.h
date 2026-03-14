@@ -82,11 +82,12 @@ Overloaded(Ts...) -> Overloaded<Ts...>;
     virtual const char* name() const { return #Name; }                    \
     virtual int Depth() const { return 0; }                               \
     virtual Base* ParentState() const { return nullptr; }                 \
-    virtual void Enter(_Context ctx);                                     \
-    virtual void Exit(_Context ctx);                                      \
     virtual Base* HandleEvent(const _Event& event, _Context ctx);        \
                                                                            \
    protected:                                                             \
+    virtual void Enter(_Context ctx);                                     \
+    virtual void Exit(_Context ctx);                                      \
+                                                                           \
     template <typename... Fs>                                               \
     static Base* Switch(const _Event& event, Fs&&... fs) {                \
       return std::visit(                                                  \
