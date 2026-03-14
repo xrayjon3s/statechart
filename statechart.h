@@ -79,14 +79,6 @@ Overloaded(Ts...) -> Overloaded<Ts...>;
       return next ? next : this;                                          \
     }                                                                      \
                                                                            \
-    template <typename... Fs>                                               \
-    static Base* Switch(const _Event& event, Fs&&... fs) {                \
-      return std::visit(                                                  \
-          statechart::Overloaded<std::decay_t<Fs>...>{                   \
-              std::forward<Fs>(fs)...},                                   \
-          event);                                                         \
-    }                                                                      \
-                                                                           \
     virtual const char* name() const { return #Name; }                    \
     virtual int Depth() const { return 0; }                               \
     virtual Base* ParentState() const { return nullptr; }                 \
@@ -95,6 +87,14 @@ Overloaded(Ts...) -> Overloaded<Ts...>;
     virtual Base* HandleEvent(const _Event& event, _Context ctx);        \
                                                                            \
    protected:                                                             \
+    template <typename... Fs>                                               \
+    static Base* Switch(const _Event& event, Fs&&... fs) {                \
+      return std::visit(                                                  \
+          statechart::Overloaded<std::decay_t<Fs>...>{                   \
+              std::forward<Fs>(fs)...},                                   \
+          event);                                                         \
+    }                                                                      \
+                                                                           \
     static void EnterState(Base* state, Base* lca, _Context ctx) {        \
       if (!state) return;                                                \
       if (state == lca) return;                                          \
