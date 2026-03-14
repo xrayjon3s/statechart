@@ -84,10 +84,30 @@ For more examples, see `statechart_test.cc`.
 ## Building
 
 ```bash
+# Using the Makefile (recommended)
+make              # Build
+make test         # Build and run tests
+make clean        # Clean build artifacts
+
+# Or using CMake directly
 mkdir build && cd build
 cmake ..
 make
 ./statechart_test
+```
+
+## Tutorial Example
+
+See `traffic_light.cc` for a complete example of a traffic light controller:
+
+- Two directions (North-South, East-West)
+- Green → Yellow → Red cycle
+- WALK button extends red light duration to 60 seconds
+- HEARTBEAT event every second for timing
+
+```bash
+make traffic_light
+./build/traffic_light
 ```
 
 ## License
