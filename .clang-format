@@ -5,5 +5,5 @@
 # https://google.github.io/styleguide/cppguide.html
 
 BasedOnStyle: Google
-IndentWidth: 2
+IndentWidth: 4
 ColumnLimit: 80

@@ -55,7 +55,7 @@ HANDLE_EVENT(Root, Root) {
 
 // Use it
 Context ctx;
-Root* state = Root::make();
+Root* state = Root::Start(A::make(), &ctx);
 state = state->Dispatch(EvFoo{}, &ctx);
 ```
 

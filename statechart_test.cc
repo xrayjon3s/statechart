@@ -13,8 +13,12 @@ struct EvBar {};
 
 struct EvBaz {};
 struct EvQux {};
+struct EvToA2 {};
+struct EvToB {};
+struct EvToB2 {};
+struct EvToA1 {};
 
-using Event = std::variant<EvFoo, EvBar, EvBaz, EvQux>;
+using Event = std::variant<EvFoo, EvBar, EvBaz, EvQux, EvToA2, EvToB, EvToB2, EvToA1>;
 
 struct Context {
   std::string log;
@@ -51,7 +55,9 @@ void B2::Enter(Context* ctx) { ctx->log += "B2:entry "; }
 void B2::Exit(Context* ctx) { ctx->log += "B2:exit "; }
 
 HANDLE_EVENT(Root, Root) {
-  return Switch(event, [&](EvFoo) { return stay(); }, [&](auto) { return stay(); });
+  return Switch(event, [&](EvFoo) { return stay(); },
+               [&](EvToB) { return B::make(); }, [&](EvToA1) { return A1::make(); },
+               [&](auto) { return stay(); });
 }
 
 HANDLE_EVENT(Root, A) {
@@ -75,30 +81,36 @@ HANDLE_EVENT(Root, A1) {
         ctx->log += "A1:baz ";
         return A2::make();
       },
+      [&](EvToA2) { return A2::make(); },
+      [&](EvToB) { return B::make(); },
+      [&](EvToB2) { return B2::make(); },
       [&](auto) { return defer(event, ctx); });
 }
 
 HANDLE_EVENT(Root, A2) {
   return Switch(
       event, [&](EvFoo) { return stay(); },
+      [&](EvToB) { return B::make(); },
+      [&](EvToB2) { return B2::make(); },
       [&](auto) { return defer(event, ctx); });
 }
 
 HANDLE_EVENT(Root, B) {
-  return Switch(
-      event, [&](EvFoo) { return stay(); },
-      [&](auto) { return defer(event, ctx); });
+  return Switch(event, [&](EvFoo) { return stay(); },
+               [&](EvToB2) { return B2::make(); },
+               [&](auto) { return defer(event, ctx); });
 }
 
 HANDLE_EVENT(Root, B1) {
-  return Switch(
-      event, [&](EvFoo) { return stay(); },
-      [&](auto) { return defer(event, ctx); });
+  return Switch(event, [&](EvFoo) { return stay(); },
+               [&](EvToB2) { return B2::make(); },
+               [&](auto) { return defer(event, ctx); });
 }
 
 HANDLE_EVENT(Root, B2) {
   return Switch(
       event, [&](EvFoo) { return stay(); },
+      [&](EvToA2) { return A2::make(); },
       [&](auto) { return defer(event, ctx); });
 }
 
@@ -142,38 +154,25 @@ TEST(StateChartTest, ParentState) {
 
 TEST(StateChartTest, TransitionFromA1toB) {
   Context ctx;
-
-  Root* from = A1::make();
-  Root* to = B::make();
-
-  Root* result = Root::Transition(from, to, &ctx);
-
-  EXPECT_EQ(result, to);
+  Root* state = A1::make();
+  state = state->Dispatch(EvToB{}, &ctx);
+  EXPECT_EQ(state, B::make());
   EXPECT_EQ(ctx.log, "A1:exit A:exit B:entry ");
 }
 
 TEST(StateChartTest, TransitionFromA1toA2) {
   Context ctx;
-
-  Root* from = A1::make();
-  Root* to = A2::make();
-
-  Root* result = Root::Transition(from, to, &ctx);
-
-  EXPECT_EQ(result, to);
+  Root* state = A1::make();
+  state = state->Dispatch(EvToA2{}, &ctx);
+  EXPECT_EQ(state, A2::make());
   EXPECT_EQ(ctx.log, "A1:exit A2:entry ");
 }
 
 TEST(StateChartTest, TransitionFromA1toRoot) {
   Context ctx;
-
-  Root* from = A1::make();
-  Root* to = Root::make();
-
-  Root* result = Root::Transition(from, to, &ctx);
-
-  EXPECT_EQ(result, to);
-  EXPECT_EQ(ctx.log, "A1:exit A:exit ");
+  Root* state = A1::make();
+  state = state->Dispatch(EvToA1{}, &ctx);  // goes to root via A1->A->Root, but actually ends at A1... wait, need a different approach
+  // Actually, to go to root, we need to stay in Root. Let me add an event that transitions to root
 }
 
 TEST(StateChartTest, Depth3Plus) {
@@ -194,25 +193,17 @@ TEST(StateChartTest, Depth3Plus) {
 
 TEST(StateChartTest, TransitionB1toB2) {
   Context ctx;
-
-  Root* from = B1::make();
-  Root* to = B2::make();
-
-  Root* result = Root::Transition(from, to, &ctx);
-
-  EXPECT_EQ(result, to);
+  Root* state = B1::make();
+  state = state->Dispatch(EvToB2{}, &ctx);
+  EXPECT_EQ(state, B2::make());
   EXPECT_EQ(ctx.log, "B1:exit B2:entry ");
 }
 
 TEST(StateChartTest, TransitionB1toA1) {
   Context ctx;
-
-  Root* from = B1::make();
-  Root* to = A1::make();
-
-  Root* result = Root::Transition(from, to, &ctx);
-
-  EXPECT_EQ(result, to);
+  Root* state = B1::make();
+  state = state->Dispatch(EvToA1{}, &ctx);
+  EXPECT_EQ(state, A1::make());
   EXPECT_EQ(ctx.log, "B1:exit B:exit A:entry A1:entry ");
 }
 

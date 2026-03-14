@@ -50,108 +50,109 @@ Overloaded(Ts...) -> Overloaded<Ts...>;
 //   _ContextType - Type of the context object passed to Enter/Exit
 //
 // Generates a class with:
-//   - Static methods: make(), defer(), Transition(), Start(), Dispatch()
-//   - Virtual methods: stay(), name(), Depth(), ParentState(), Enter(), Exit(),
-//   HandleEvent()
+//   - Public: make(), defer(), Start(), Dispatch(), Switch()
+//   - Protected: Transition() (internal use)
+//   - Virtual: stay(), name(), Depth(), ParentState(), Enter(), Exit(), HandleEvent()
 //   - Type aliases: Base, Parent, ParentType, _Event, _Context
-#define STATECHART(Name, _EventType, _ContextType)                          \
+#define STATECHART(Name, _EventType, _ContextType)                           \
   class Name {                                                              \
    public:                                                                  \
     using Base = Name;                                                      \
     using Parent = Name;                                                    \
     using ParentType = Name;                                                \
-    using _Event = _EventType;                                              \
+    using _Event = _EventType;                                             \
     using _Context = _ContextType;                                          \
-                                                                            \
+                                                                           \
     static Base* make() {                                                   \
       static Name singleton;                                                \
       return &singleton;                                                    \
-    }                                                                       \
-                                                                            \
-    virtual Base* stay() { return this; }                                   \
-                                                                            \
-    static Base* defer(const _Event& event, _Context ctx) {                 \
+    }                                                                      \
+                                                                           \
+    virtual Base* stay() { return this; }                                  \
+                                                                           \
+    static Base* defer(const _Event& event, _Context ctx) {                  \
       return make()->ParentState()->HandleEvent(event, ctx);                \
-    }                                                                       \
-                                                                            \
-    virtual const char* name() const { return #Name; }                      \
+    }                                                                      \
+                                                                           \
+    static Base* Start(Base* initial, _Context ctx);                        \
+    Base* Dispatch(const _Event& event, _Context ctx) {                      \
+      Base* next = this->HandleEvent(event, ctx);                          \
+      if (next && next != this) {                                          \
+        return Transition(this, next, ctx);                                 \
+      }                                                                    \
+      return next ? next : this;                                           \
+    }                                                                      \
+                                                                           \
+    template <typename... Fs>                                               \
+    static Base* Switch(const _Event& event, Fs&&... fs) {                 \
+      return std::visit(                                                    \
+          statechart::Overloaded<std::decay_t<Fs>...>{                    \
+              std::forward<Fs>(fs)...},                                    \
+          event);                                                          \
+    }                                                                      \
+                                                                           \
+    virtual const char* name() const { return #Name; }                     \
     virtual int Depth() const { return 0; }                                 \
     virtual Base* ParentState() const { return nullptr; }                   \
     virtual void Enter(_Context ctx);                                       \
-    virtual void Exit(_Context ctx);                                        \
+    virtual void Exit(_Context ctx);                                       \
     virtual Base* HandleEvent(const _Event& event, _Context ctx);           \
-                                                                            \
-    static Base* Transition(Base* from, Base* to, _Context ctx);            \
-    static Base* Start(Base* initial, _Context ctx);                        \
-    Base* Dispatch(const _Event& event, _Context ctx) {                     \
-      Base* next = this->HandleEvent(event, ctx);                           \
-      if (next && next != this) {                                          \
-        return Transition(this, next, ctx);                                  \
-      }                                                                     \
-      return next ? next : this;                                            \
-    }                                                                       \
-                                                                            \
-    /* Switch - Helper for std::visit with Overloaded */                    \
-    template <typename... Fs>                                               \
-    static Base* Switch(const _Event& event, Fs&&... fs) {                  \
-      return std::visit(                                                    \
-          statechart::Overloaded<std::decay_t<Fs>...>{                      \
-              std::forward<Fs>(fs)...},                                     \
-          event);                                                           \
-    }                                                                       \
+                                                                           \
+   protected:                                                               \
+    static Base* Transition(Base* from, Base* to, _Context ctx);           \
   };                                                                        \
-                                                                            \
-  static void Name##_EnterState(Name::Base* state, Name::Base* lca,         \
+                                                                           \
+  static void Name##_EnterState(Name::Base* state, Name::Base* lca,        \
                                 Name::_Context ctx) {                       \
-    if (!state) return;                                                     \
-    if (state == lca) return;                                               \
-    Name##_EnterState(static_cast<Name::Base*>(state->ParentState()), lca,  \
-                      ctx);                                                 \
-    state->Enter(ctx);                                                      \
-  }                                                                         \
-  static void Name##_ExitState(Name::Base* state, Name::Base* lca,          \
-                               Name::_Context ctx) {                        \
-    if (!state) return;                                                     \
-    if (state == lca) return;                                               \
-    state->Exit(ctx);                                                       \
-    Name##_ExitState(static_cast<Name::Base*>(state->ParentState()), lca,   \
-                     ctx);                                                  \
-  }                                                                         \
-  Name::Base* Name::Transition(Name::Base* from, Name::Base* to,            \
-                               Name::_Context ctx) {                        \
-    if (!to) return from ? from : Name::make();                             \
-    if (!from) {                                                            \
-      Name##_EnterState(to, nullptr, ctx);                                  \
-      return to;                                                            \
-    }                                                                       \
+    if (!state) return;                                                    \
+    if (state == lca) return;                                              \
+    Name##_EnterState(static_cast<Name::Base*>(state->ParentState()),       \
+                      lca, ctx);                                          \
+    state->Enter(ctx);                                                     \
+  }                                                                        \
+  static void Name##_ExitState(Name::Base* state, Name::Base* lca,         \
+                               Name::_Context ctx) {                       \
+    if (!state) return;                                                    \
+    if (state == lca) return;                                              \
+    state->Exit(ctx);                                                      \
+    Name##_ExitState(static_cast<Name::Base*>(state->ParentState()),        \
+                     lca, ctx);                                           \
+  }                                                                        \
+  Name::Base* Name::Transition(Name::Base* from, Name::Base* to,          \
+                               Name::_Context ctx) {                       \
+    if (!to) return from ? from : Name::make();                            \
+    if (!from) {                                                           \
+      Name##_EnterState(to, nullptr, ctx);                                 \
+      return to;                                                           \
+    }                                                                      \
     int fromDepth = from->Depth();                                          \
-    int toDepth = to->Depth();                                              \
-    Name::Base* fromCopy = from;                                            \
-    Name::Base* toCopy = to;                                                \
+    int toDepth = to->Depth();                                             \
+    Name::Base* fromCopy = from;                                           \
+    Name::Base* toCopy = to;                                              \
     while (fromDepth > toDepth) {                                           \
       fromCopy = static_cast<Name::Base*>(fromCopy->ParentState());         \
-      fromDepth--;                                                          \
-    }                                                                       \
+      fromDepth--;                                                         \
+    }                                                                      \
     while (toDepth > fromDepth) {                                           \
       toCopy = static_cast<Name::Base*>(toCopy->ParentState());             \
-      toDepth--;                                                            \
-    }                                                                       \
-    while (fromCopy != toCopy) {                                            \
-      fromCopy = static_cast<Name::Base*>(fromCopy->ParentState());         \
-      toCopy = static_cast<Name::Base*>(toCopy->ParentState());             \
-    }                                                                       \
-    Name::Base* lca = fromCopy;                                             \
-    Name##_ExitState(from, lca, ctx);                                       \
-    Name##_EnterState(to, lca, ctx);                                        \
-    return to;                                                              \
-  }                                                                         \
-  Name::Base* Name::Start(Name::Base* initial, Name::_Context ctx) {        \
-    Name::Base* top = make();                                               \
-    top->Enter(ctx);                                                        \
-    if (initial && initial != top) {                                        \
-      return Transition(top, initial, ctx);                                 \
-    }                                                                       \
-    return top;                                                             \
+      toDepth--;                                                           \
+    }                                                                      \
+    while (fromCopy != toCopy) {                                           \
+      fromCopy = static_cast<Name::Base*>(fromCopy->ParentState());        \
+      toCopy = static_cast<Name::Base*>(toCopy->ParentState());            \
+    }                                                                      \
+    Name::Base* lca = fromCopy;                                            \
+    Name##_ExitState(from, lca, ctx);                                      \
+    Name##_EnterState(to, lca, ctx);                                       \
+    return to;                                                            \
+  }                                                                        \
+  Name::Base* Name::Start(Name::Base* initial, Name::_Context ctx) {       \
+    Name::Base* top = make();                                              \
+    top->Enter(ctx);                                                       \
+    if (initial && initial != top) {                                       \
+      return Transition(top, initial, ctx);                                \
+    }                                                                      \
+    return top;                                                            \
   }
 
 // STATE - Defines a child state in the hierarchy
@@ -163,36 +164,35 @@ Overloaded(Ts...) -> Overloaded<Ts...>;
 //
 // Generates a class that:
 //   - Inherits from Parent
-//   - Overrides: stay(), name(), Depth(), ParentState(), Enter(), Exit(),
-//   HandleEvent()
-//   - Shadows static methods: make(), defer()
-#define STATE(HSM, Name, Parent)                                       \
-  class Name : public Parent {                                         \
-   public:                                                             \
-    using Base = Name;                                                 \
-    using Parent = Parent;                                             \
-    using ParentType = Parent;                                         \
-                                                                       \
-    static HSM::Base* make() {                                         \
-      static Name singleton;                                           \
-      return &singleton;                                               \
-    }                                                                  \
-                                                                       \
-    HSM::Base* stay() override { return this; }                        \
-                                                                       \
-    static HSM::Base* defer(const typename HSM::_Event& event,         \
-                            typename HSM::_Context ctx) {              \
-      return Parent::make()->HandleEvent(event, ctx);                  \
-    }                                                                  \
-                                                                       \
-    const char* name() const override { return #Name; }                \
-    int Depth() const override { return Parent::Depth() + 1; }         \
-    HSM::Base* ParentState() const override { return Parent::make(); } \
-    virtual void Enter(typename HSM::_Context ctx);                    \
-    virtual void Exit(typename HSM::_Context ctx);                     \
-    using Parent::HandleEvent;                                         \
-    virtual HSM::Base* HandleEvent(const typename HSM::_Event& event,  \
-                                   typename HSM::_Context ctx);        \
+//   - Public static: make(), defer()
+//   - Virtual: stay(), name(), Depth(), ParentState(), Enter(), Exit(), HandleEvent()
+#define STATE(HSM, Name, Parent)                                           \
+  class Name : public Parent {                                             \
+   public:                                                                 \
+    using Base = Name;                                                     \
+    using Parent = Parent;                                                 \
+    using ParentType = Parent;                                             \
+                                                                           \
+    static HSM::Base* make() {                                            \
+      static Name singleton;                                               \
+      return &singleton;                                                   \
+    }                                                                      \
+                                                                           \
+    HSM::Base* stay() override { return this; }                            \
+                                                                           \
+    static HSM::Base* defer(const typename HSM::_Event& event,            \
+                            typename HSM::_Context ctx) {                  \
+      return Parent::make()->HandleEvent(event, ctx);                      \
+    }                                                                      \
+                                                                           \
+    const char* name() const override { return #Name; }                     \
+    int Depth() const override { return Parent::Depth() + 1; }             \
+    HSM::Base* ParentState() const override { return Parent::make(); }     \
+    virtual void Enter(typename HSM::_Context ctx);                         \
+    virtual void Exit(typename HSM::_Context ctx);                         \
+    using Parent::HandleEvent;                                             \
+    virtual HSM::Base* HandleEvent(const typename HSM::_Event& event,     \
+                                   typename HSM::_Context ctx);             \
   }
 
 // HANDLE_EVENT - Defines the event handler implementation for a state
@@ -201,23 +201,11 @@ Overloaded(Ts...) -> Overloaded<Ts...>;
 //   HSM  - The top-level state (HSM) type
 //   Name - Name of the state class to handle events for
 //
-// Usage (with std::visit and Overloaded):
+// Usage:
 //   HANDLE_EVENT(Root, A) {
-//     return std::visit(statechart::Overloaded{
+//     return Switch(event,
 //       [&](EvFoo) { return stay(); },
-//       [&](EvBar) { return B::make(); }
-//     }, event);
-//   }
-//
-// Alternative usage (with switch on event index):
-//   HANDLE_EVENT(Root, A) {
-//     switch (event.index()) {
-//       case 0:  // EvFoo
-//         return stay();
-//       case 1:  // EvBar
-//         return B::make();
-//     }
-//     return nullptr;  // no transition
+//       [&](EvBar) { return B::make(); });
 //   }
 #define HANDLE_EVENT(HSM, Name)                                            \
   HSM::Base* Name::HandleEvent(const typename Name::Parent::_Event& event, \
