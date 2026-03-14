@@ -42,10 +42,10 @@ struct Context {
   int red_extension = 0;      // Extra seconds to add to ALL_RED (from WALK)
 
   // Light durations (in seconds)
-  static constexpr int GREEN_DURATION = 30;
-  static constexpr int YELLOW_DURATION = 5;
-  static constexpr int ALL_RED_DURATION = 3;
-  static constexpr int WALK_RED_EXTENSION = 60;
+  static constexpr int GREEN_DURATION = 5;
+  static constexpr int YELLOW_DURATION = 1;
+  static constexpr int ALL_RED_DURATION = 2;
+  static constexpr int WALK_RED_EXTENSION = 10;
 };
 
 // ============================================================================
