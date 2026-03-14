@@ -56,7 +56,7 @@ HANDLE_EVENT(Root, Root) {
 // Use it
 Context ctx;
 Root* state = Root::make();
-state = Root::Dispatch(state, EvFoo{}, &ctx);
+state = state->Dispatch(EvFoo{}, &ctx);
 ```
 
 For more examples, see `statechart_test.cc`.

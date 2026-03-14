@@ -112,7 +112,7 @@ TEST(StateChartTest, SelfTransition) {
   Context ctx;
   auto* state = Root::make();
 
-  state = Root::Dispatch(state, EvFoo{}, &ctx);
+  state = state->Dispatch( EvFoo{}, &ctx);
   EXPECT_STREQ(state->name(), "Root");
 }
 
@@ -256,7 +256,7 @@ TEST(StateChartTest, StayHandler) {
   Context ctx;
 
   Root* state = A1::make();
-  state = Root::Dispatch(state, EvFoo{}, &ctx);
+  state = state->Dispatch( EvFoo{}, &ctx);
 
   EXPECT_EQ(state, A1::make());
   EXPECT_EQ(ctx.log, "A1:foo ");
@@ -266,7 +266,7 @@ TEST(StateChartTest, DeferHandler) {
   Context ctx;
 
   Root* state = A1::make();
-  state = Root::Dispatch(state, EvBar{}, &ctx);
+  state = state->Dispatch( EvBar{}, &ctx);
 
   EXPECT_EQ(state, Root::make());
 }
@@ -275,7 +275,7 @@ TEST(StateChartTest, ChildOverridesParentEvent) {
   Context ctx;
 
   Root* state = A1::make();
-  state = Root::Dispatch(state, EvBaz{}, &ctx);
+  state = state->Dispatch( EvBaz{}, &ctx);
 
   EXPECT_EQ(state, A2::make());
   EXPECT_EQ(ctx.log, "A1:baz A1:exit A2:entry ");
@@ -285,7 +285,7 @@ TEST(StateChartTest, ParentEventBaz) {
   Context ctx;
 
   Root* state = A::make();
-  state = Root::Dispatch(state, EvBaz{}, &ctx);
+  state = state->Dispatch( EvBaz{}, &ctx);
 
   EXPECT_EQ(state, A::make());
   EXPECT_EQ(ctx.log, "A:baz ");
@@ -357,7 +357,7 @@ TEST(StateChartTest, SwitchOnVariantIndex) {
 
   // Skip the FOO dispatch for now, just test BAR
   ctx.log.clear();
-  state = Machine::Dispatch(state, TokenEvent{TokenEvent::Token::BAR}, &ctx);
+  state = state->Dispatch( TokenEvent{TokenEvent::Token::BAR}, &ctx);
   EXPECT_EQ(state, S2::make());
   EXPECT_EQ(ctx.log, "S1:exit S2:entry ");
 }
@@ -368,7 +368,7 @@ TEST(StateChartTest, SwitchWithStructEvent) {
   Machine* state = Machine::Start(S1::make(), &ctx);
 
   ctx.log.clear();
-  state = Machine::Dispatch(state, TokenEvent{TokenEvent::Token::BAZ}, &ctx);
+  state = state->Dispatch( TokenEvent{TokenEvent::Token::BAZ}, &ctx);
   EXPECT_EQ(state, S2::make());
   EXPECT_EQ(ctx.log, "S1:baz S1:exit S2:entry ");
 }

@@ -83,13 +83,12 @@ Overloaded(Ts...) -> Overloaded<Ts...>;
                                                                             \
     static Base* Transition(Base* from, Base* to, _Context ctx);            \
     static Base* Start(Base* initial, _Context ctx);                        \
-    static Base* Dispatch(Base* state, const _Event& event, _Context ctx) { \
-      if (!state) return state;                                             \
-      Base* next = state->HandleEvent(event, ctx);                          \
-      if (next && next != state) {                                          \
-        return Transition(state, next, ctx);                                \
+    Base* Dispatch(const _Event& event, _Context ctx) {                     \
+      Base* next = this->HandleEvent(event, ctx);                           \
+      if (next && next != this) {                                          \
+        return Transition(this, next, ctx);                                  \
       }                                                                     \
-      return state;                                                         \
+      return next ? next : this;                                            \
     }                                                                       \
                                                                             \
     /* Switch - Helper for std::visit with Overloaded */                    \
