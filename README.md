@@ -49,19 +49,14 @@ void A::Exit(Context* ctx) { /* ... */ }
 
 // Define event handlers
 HANDLE_EVENT(Root, Root) {
-  return std::visit(statechart::Overloaded{
-    [&](EvFoo) { return stay(); },
-    [&](auto) { return stay(); }
-  }, event);
+  return Root::Switch(event, [&](EvFoo) { return stay(); },
+                      [&](auto) { return stay(); });
 }
 
 // Use it
 Context ctx;
 Root* state = Root::make();
-state = DISPATCH(state, EvFoo{}, &ctx);
-
-// Or use Transition for state changes with proper entry/exit
-Root::Transition(currentState, newState, &ctx);
+state = Root::Dispatch(state, EvFoo{}, &ctx);
 ```
 
 For more examples, see `statechart_test.cc`.

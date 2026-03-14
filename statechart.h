@@ -91,6 +91,15 @@ Overloaded(Ts...) -> Overloaded<Ts...>;
       }                                                                     \
       return state;                                                         \
     }                                                                       \
+                                                                            \
+    /* Switch - Helper for std::visit with Overloaded */                    \
+    template <typename... Fs>                                               \
+    static Base* Switch(const _Event& event, Fs&&... fs) {                  \
+      return std::visit(                                                    \
+          statechart::Overloaded<std::decay_t<Fs>...>{                      \
+              std::forward<Fs>(fs)...},                                     \
+          event);                                                           \
+    }                                                                       \
   };                                                                        \
                                                                             \
   static void Name##_EnterState(Name::Base* state, Name::Base* lca,         \
