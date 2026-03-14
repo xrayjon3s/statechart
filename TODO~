@@ -1,3 +1,0 @@
-- Make as many methods as possible private to prevent API misuse
-- clang format
-- remove none() - that was needed only when enter/exit were events, not separate functions, in an earlier version
