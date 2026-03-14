@@ -18,7 +18,8 @@ FetchContent_MakeAvailable(googletest)
 
 enable_testing()
 
-add_executable(statechart_test statechart_test.cc)
+add_executable(statechart_test statechart_test.cpp)
+target_include_directories(statechart_test PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(statechart_test gtest_main)
 include(GoogleTest)
 gtest_discover_tests(statechart_test)

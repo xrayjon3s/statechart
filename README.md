@@ -47,8 +47,8 @@ For XML-based statechart references, see the [W3C SCXML Specification](https://w
 #include <variant>
 
 // Define events
-struct EvFoo {};
-struct EvBar {};
+struct EvFoo {};   // Go to A, or A1 if already in A
+struct EvBar {};   // Go to B from anywhere
 using Event = std::variant<EvFoo, EvBar>;
 
 // Define extended state (context)
@@ -57,26 +57,63 @@ struct Context {
 };
 
 // Define state machine
+// Hierarchy:
+//   Root
+//   ├── A
+//   │   └── A1
+//   └── B
 STATECHART(Root, Event, Context*);
 STATE(Root, A, Root);
+STATE(Root, A1, A);
 STATE(Root, B, Root);
 
 // Define entry/exit actions (protected - define in .cpp or friend class)
-void Root::Enter(Context* ctx) { /* ... */ }
-void Root::Exit(Context* ctx) { /* ... */ }
-void A::Enter(Context* ctx) { /* ... */ }
-void A::Exit(Context* ctx) { /* ... */ }
+void Root::Enter(Context* ctx) { ctx->log += "Root:entry "; }
+void Root::Exit(Context* ctx) { ctx->log += "Root:exit "; }
+
+void A::Enter(Context* ctx) { ctx->log += "A:entry "; }
+void A::Exit(Context* ctx) { ctx->log += "A:exit "; }
+
+void A1::Enter(Context* ctx) { ctx->log += "A1:entry "; }
+void A1::Exit(Context* ctx) { ctx->log += "A1:exit "; }
+
+void B::Enter(Context* ctx) { ctx->log += "B:entry "; }
+void B::Exit(Context* ctx) { ctx->log += "B:exit "; }
 
 // Define event handlers
+// Root handles EvBar (go to B from anywhere)
 HANDLE_EVENT(Root, Root) {
-  return Switch(event, [&](EvFoo) { return stay(); },
-               [&](auto) { return stay(); });
+  return Switch(event,
+    [&](EvBar) { return B::make(); },
+    [&](auto) { return stay(); });
+}
+
+// A handles EvFoo (go to A1 if in A)
+HANDLE_EVENT(Root, A) {
+  return Switch(event,
+    [&](EvFoo) { return A1::make(); },
+    [&](auto) { return defer(event, ctx); });
+}
+
+// A1 handles EvFoo (stay in A1)
+HANDLE_EVENT(Root, A1) {
+  return Switch(event,
+    [&](EvFoo) { return stay(); },
+    [&](auto) { return defer(event, ctx); });
+}
+
+// B handles EvBar (stay in B, defer others)
+HANDLE_EVENT(Root, B) {
+  return Switch(event,
+    [&](EvBar) { return stay(); },
+    [&](auto) { return defer(event, ctx); });
 }
 
 // Use it
 Context ctx;
-Root* state = Root::Start(A::make(), &ctx);
-state = state->Dispatch(EvFoo{}, &ctx);
+Root* state = Root::Start(A::make(), &ctx);  // Start in A
+state = state->Dispatch(EvFoo{}, &ctx);       // Transition to A1
+state = state->Dispatch(EvBar{}, &ctx);       // Transition to B
 ```
 
 For more examples, see `statechart_test.cc`.
