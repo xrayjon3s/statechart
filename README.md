@@ -10,6 +10,33 @@ This is a modern implementation of statecharts based on David Harel's seminal 19
 
 > Harel, D. (1987). [Statecharts: A Visual Formalism for Complex Systems](https://doi.org/10.1016/0167-6423(87)90035-9). Science of Computer Programming, 8(3), 231-274.
 
+Entry/exit actions and state functions can be expressed correctly and concisely. A brief code fragment (longer example is below):
+
+```
+STATECHART(Root, Event, Context*); // Define state chart with user event and context types
+STATE(Root, A, Root); // Define substate A with parent Root
+
+...
+
+// Entry and exit actions
+void A::Enter(Context* ctx) { ctx->log += "A:entry "; }
+void A::Exit(Context* ctx) { ctx->log += "A:exit "; }
+
+// Event handler in state A
+HANDLE_EVENT(Root, A) {
+  return Switch(event,
+    // Handle EvFoo - transition to state A1
+    [&](EvFoo) { ctx->log += a.message; return A1::make(); },
+    // Defer other events to parent
+    [&](auto) { return defer(event, ctx); });
+}
+
+// Handle an event with data and, if needed, change states including
+// executing all nested entry and exit actions.
+state = state->Dispatch(EvFoo{"hello"}, &ctx);
+
+```
+
 Statecharts, also known as Hierarchical State Machines, are a type of finite state machine that can have nested states.  These are very 
 useful in event-driven system that need to respond differently to events based on internal state.  For example, a driver
 may need to power on a remote device and walk through a configuration sequence when a request comes, but if the device
