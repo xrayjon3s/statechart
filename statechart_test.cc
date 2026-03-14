@@ -33,6 +33,7 @@ STATE(Root, B, Root);
 STATE(Root, B1, B);
 STATE(Root, B2, B);
 
+
 void Root::Enter(Context* ctx) { ctx->log += "Root:entry "; }
 void Root::Exit(Context* ctx) { ctx->log += "Root:exit "; }
 
@@ -295,6 +296,7 @@ using Event2 = std::variant<TokenEvent>;
 STATECHART(Machine, Event2, Context*);
 STATE(Machine, S1, Machine);
 STATE(Machine, S2, Machine);
+
 
 void Machine::Enter(Context* ctx) { ctx->log += "Machine:entry "; }
 void Machine::Exit(Context* ctx) { ctx->log += "Machine:exit "; }
