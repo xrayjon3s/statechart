@@ -2,13 +2,29 @@
 
 Copyright (c) 2026 Chris Leger - Licensed under the MIT License
 
-A header-only C++20 statechart framework using templates and macros.
+A single-file, header-only C++20 statechart framework.
 
 ## Overview
 
 This is a modern implementation of statecharts based on David Harel's seminal 1987 paper:
 
 > Harel, D. (1987). [Statecharts: A Visual Formalism for Complex Systems](https://doi.org/10.1016/0167-6423(87)90035-9). Science of Computer Programming, 8(3), 231-274.
+
+Statecharts, also known as Hierarchical State Machines, are a type of finite state machine that can have nested states.  These are very 
+useful in event-driven system that need to respond differently to events based on internal state.  For example, a driver
+may need to power on a remote device and walk through a configuration sequence when a request comes, but if the device
+is already on and configured, the power on and configuration may be skipped.  The device may report an error at any point, 
+indicating that an error response might be needed and requests would need to be dropped.  Thus different behavior to
+events (request) is needed based on the state (off, on, error).  Within an operating state, there may be many substates 
+depending on whether the device is busy or idle; these would be substates of 'on' and might need different response as well.
+
+You can express the same behavior with a standard finite state machine, but it requires many more states, resulting in code 
+that is far larger and harder to maintain and debug.  The power of a Statechart is that sub-states inherit all behavior
+from their parent state except whatever difference in response is needed.  This is similar to a deep class hierarchy
+where a derived class only needs to define what is different from its parent class (programming by difference).
+
+While it is possible to fully write statecharts by hand, it is difficult to consistently enforce entry/exit actions and 
+deferring of events states to parents.  This library makes statecharts more compact and correct through lots of syntactic sugar.
 
 For XML-based statechart references, see the [W3C SCXML Specification](https://www.w3.org/TR/scxml/).
 
@@ -95,15 +111,6 @@ STATE(Root, B, Root);              // Define state B with parent Root
 void Root::Enter(Context* ctx) { ctx->log += "Root:entry "; }
 void Root::Exit(Context* ctx) { ctx->log += "Root:exit "; }
 
-void A::Enter(Context* ctx) { ctx->log += "A:entry "; }
-void A::Exit(Context* ctx) { ctx->log += "A:exit "; }
-
-void A1::Enter(Context* ctx) { ctx->log += "A1:entry "; }
-void A1::Exit(Context* ctx) { ctx->log += "A1:exit "; }
-
-void B::Enter(Context* ctx) { ctx->log += "B:entry "; }
-void B::Exit(Context* ctx) { ctx->log += "B:exit "; }
-
 // Define event handlers
 // Root handles EvFoo (go to A), EvBar (go to B)
 HANDLE_EVENT(Root, Root) {
@@ -115,6 +122,9 @@ HANDLE_EVENT(Root, Root) {
     [&](auto) { return stay(); });
 }
 
+void A::Enter(Context* ctx) { ctx->log += "A:entry "; }
+void A::Exit(Context* ctx) { ctx->log += "A:exit "; }
+
 // A overrides EvFoo (go to A1 if in A)
 HANDLE_EVENT(Root, A) {
   return Switch(event,
@@ -122,12 +132,18 @@ HANDLE_EVENT(Root, A) {
     [&](auto) { return defer(event, ctx); });
 }
 
+void A1::Enter(Context* ctx) { ctx->log += "A1:entry "; }
+void A1::Exit(Context* ctx) { ctx->log += "A1:exit "; }
+
 // A1 handles EvFoo (stay in A1, don't append to message).
 HANDLE_EVENT(Root, A1) {
   return Switch(event,
     [&](EvFoo) { return stay(); },
     [&](auto) { return defer(event, ctx); });
 }
+
+void B::Enter(Context* ctx) { ctx->log += "B:entry "; }
+void B::Exit(Context* ctx) { ctx->log += "B:exit "; }
 
 // B inerits responses
 HANDLE_EVENT(Root, B) {
