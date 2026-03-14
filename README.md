@@ -17,8 +17,28 @@ For XML-based statechart references, see the [W3C SCXML Specification](https://w
 - Header-only, single-file library
 - Hierarchical state machines with deep inheritance
 - Automatic entry/exit actions via LCA (Least Common Ancestor) algorithm
-- Support for defer(), stay(), and none() transitions
-- Entry/Exit virtual methods for each state
+- Clean API: only 4 public static methods needed for most use cases
+
+## API
+
+### Public Methods
+
+- `static Base* make()` - Returns singleton instance of a state
+- `static Base* Start(Base* initial, _Context ctx)` - Initialize state machine
+- `Base* Dispatch(const _Event& event, _Context ctx)` - Handle event, returns new state
+- `static Base* defer(const _Event& event, _Context ctx)` - Delegate to parent state
+
+### Protected Methods (for use in event handlers)
+
+- `virtual Base* stay()` - Stay in current state
+- `virtual Base* HandleEvent(...)` - Override to handle events
+- `virtual void Enter(_Context ctx)` - Override for entry action
+- `virtual void Exit(_Context ctx)` - Override for exit action
+- `template<typename... Fs> static Base* Switch(...)` - Helper for std::visit
+
+### Internal (Protected)
+
+- `Transition()`, `EnterState()`, `ExitState()` - Called by Dispatch/Start
 
 ## Quick Example
 
@@ -41,7 +61,7 @@ STATECHART(Root, Event, Context*);
 STATE(Root, A, Root);
 STATE(Root, B, Root);
 
-// Define entry/exit actions
+// Define entry/exit actions (protected - define in .cpp or friend class)
 void Root::Enter(Context* ctx) { /* ... */ }
 void Root::Exit(Context* ctx) { /* ... */ }
 void A::Enter(Context* ctx) { /* ... */ }

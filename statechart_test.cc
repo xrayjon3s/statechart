@@ -1,6 +1,8 @@
 // Copyright (c) 2026 Chris Leger
 // Licensed under the MIT License
 
+// Unit tests for the statechart framework
+
 #include "statechart.h"
 
 #include <gtest/gtest.h>
@@ -8,23 +10,49 @@
 #include <string>
 #include <variant>
 
+// ============================================================================
+// Test Events
+// ============================================================================
+
+// Basic events
 struct EvFoo {};
 struct EvBar {};
 
+// Additional events for testing transitions
 struct EvBaz {};
 struct EvQux {};
-struct EvToA2 {};
-struct EvToB {};
-struct EvToB2 {};
-struct EvToA1 {};
 
+// Events to trigger specific transitions
+struct EvToA2 {};    // Transition to A2
+struct EvToB {};     // Transition to B
+struct EvToB2 {};    // Transition to B2
+struct EvToA1 {};    // Transition to A1 (via Root)
+
+// Event variant for first state machine
 using Event = std::variant<EvFoo, EvBar, EvBaz, EvQux, EvToA2, EvToB, EvToB2, EvToA1>;
 
+// ============================================================================
+// Context
+// ============================================================================
+
+// Context stores extended state - used to track entry/exit actions
 struct Context {
   std::string log;
   int value = 0;
 };
 
+// ============================================================================
+// State Machine Definition
+// ============================================================================
+
+// Define the hierarchical state machine:
+//   Root
+//   ├── A
+//   │   ├── A1
+//   │   └── A2
+//   └── B
+//       ├── B1
+//       └── B2
 STATECHART(Root, Event, Context*);
 STATE(Root, A, Root);
 STATE(Root, A1, A);
@@ -33,7 +61,11 @@ STATE(Root, B, Root);
 STATE(Root, B1, B);
 STATE(Root, B2, B);
 
+// ============================================================================
+// Entry/Exit Actions
+// ============================================================================
 
+// Entry and exit actions log to context for testing
 void Root::Enter(Context* ctx) { ctx->log += "Root:entry "; }
 void Root::Exit(Context* ctx) { ctx->log += "Root:exit "; }
 
@@ -55,12 +87,18 @@ void B1::Exit(Context* ctx) { ctx->log += "B1:exit "; }
 void B2::Enter(Context* ctx) { ctx->log += "B2:entry "; }
 void B2::Exit(Context* ctx) { ctx->log += "B2:exit "; }
 
+// ============================================================================
+// Event Handlers
+// ============================================================================
+
+// Root state handler - handles events at top level
 HANDLE_EVENT(Root, Root) {
   return Switch(event, [&](EvFoo) { return stay(); },
                [&](EvToB) { return B::make(); }, [&](EvToA1) { return A1::make(); },
                [&](auto) { return stay(); });
 }
 
+// A state handler - default is to defer to parent
 HANDLE_EVENT(Root, A) {
   return Switch(
       event, [&](EvFoo) { return stay(); },
@@ -71,6 +109,7 @@ HANDLE_EVENT(Root, A) {
       [&](auto) { return defer(event, ctx); });
 }
 
+// A1 handler - handles transitions to sibling states
 HANDLE_EVENT(Root, A1) {
   return Switch(
       event,
@@ -88,6 +127,7 @@ HANDLE_EVENT(Root, A1) {
       [&](auto) { return defer(event, ctx); });
 }
 
+// A2 handler
 HANDLE_EVENT(Root, A2) {
   return Switch(
       event, [&](EvFoo) { return stay(); },
@@ -96,18 +136,21 @@ HANDLE_EVENT(Root, A2) {
       [&](auto) { return defer(event, ctx); });
 }
 
+// B handler
 HANDLE_EVENT(Root, B) {
   return Switch(event, [&](EvFoo) { return stay(); },
                [&](EvToB2) { return B2::make(); },
                [&](auto) { return defer(event, ctx); });
 }
 
+// B1 handler
 HANDLE_EVENT(Root, B1) {
   return Switch(event, [&](EvFoo) { return stay(); },
                [&](EvToB2) { return B2::make(); },
                [&](auto) { return defer(event, ctx); });
 }
 
+// B2 handler
 HANDLE_EVENT(Root, B2) {
   return Switch(
       event, [&](EvFoo) { return stay(); },
@@ -115,20 +158,27 @@ HANDLE_EVENT(Root, B2) {
       [&](auto) { return defer(event, ctx); });
 }
 
+// ============================================================================
+// Tests
+// ============================================================================
+
+// Test: Initial state name
 TEST(StateChartTest, InitialState) {
   Context ctx;
   auto* state = Root::make();
   EXPECT_STREQ(state->name(), "Root");
 }
 
+// Test: Self-transition with stay()
 TEST(StateChartTest, SelfTransition) {
   Context ctx;
   auto* state = Root::make();
 
-  state = state->Dispatch( EvFoo{}, &ctx);
+  state = state->Dispatch(EvFoo{}, &ctx);
   EXPECT_STREQ(state->name(), "Root");
 }
 
+// Test: Depth calculation for each state
 TEST(StateChartTest, Depth) {
   auto* r = Root::make();
   auto* a = A::make();
@@ -141,6 +191,7 @@ TEST(StateChartTest, Depth) {
   EXPECT_EQ(b->Depth(), 1);
 }
 
+// Test: Parent state relationships
 TEST(StateChartTest, ParentState) {
   auto* r = Root::make();
   auto* a = A::make();
@@ -153,6 +204,8 @@ TEST(StateChartTest, ParentState) {
   EXPECT_EQ(r->ParentState(), nullptr);
 }
 
+// Test: Transition from A1 to B (cross-branch transition)
+// Should exit: A1, A, then enter: B
 TEST(StateChartTest, TransitionFromA1toB) {
   Context ctx;
   Root* state = A1::make();
@@ -161,6 +214,8 @@ TEST(StateChartTest, TransitionFromA1toB) {
   EXPECT_EQ(ctx.log, "A1:exit A:exit B:entry ");
 }
 
+// Test: Transition from A1 to A2 (sibling transition)
+// Should exit: A1, then enter: A2
 TEST(StateChartTest, TransitionFromA1toA2) {
   Context ctx;
   Root* state = A1::make();
@@ -169,13 +224,15 @@ TEST(StateChartTest, TransitionFromA1toA2) {
   EXPECT_EQ(ctx.log, "A1:exit A2:entry ");
 }
 
+// Test: Transition back to current state (via EvToA1 routed through Root)
 TEST(StateChartTest, TransitionFromA1toRoot) {
   Context ctx;
   Root* state = A1::make();
-  state = state->Dispatch(EvToA1{}, &ctx);  // goes to root via A1->A->Root, but actually ends at A1... wait, need a different approach
-  // Actually, to go to root, we need to stay in Root. Let me add an event that transitions to root
+  state = state->Dispatch(EvToA1{}, &ctx);
+  EXPECT_EQ(state, A1::make());
 }
 
+// Test: Depth calculation for deeper hierarchy
 TEST(StateChartTest, Depth3Plus) {
   auto* r = Root::make();
   auto* a = A::make();
@@ -192,6 +249,7 @@ TEST(StateChartTest, Depth3Plus) {
   EXPECT_EQ(b2->Depth(), 2);
 }
 
+// Test: Sibling transition within same parent
 TEST(StateChartTest, TransitionB1toB2) {
   Context ctx;
   Root* state = B1::make();
@@ -200,6 +258,7 @@ TEST(StateChartTest, TransitionB1toB2) {
   EXPECT_EQ(ctx.log, "B1:exit B2:entry ");
 }
 
+// Test: Cross-branch transition from B1 to A1
 TEST(StateChartTest, TransitionB1toA1) {
   Context ctx;
   Root* state = B1::make();
@@ -208,81 +267,85 @@ TEST(StateChartTest, TransitionB1toA1) {
   EXPECT_EQ(ctx.log, "B1:exit B:exit A:entry A1:entry ");
 }
 
+// Test: Start at root state
 TEST(StateChartTest, StartAtRoot) {
   Context ctx;
-
   Root* result = Root::Start(Root::make(), &ctx);
-
   EXPECT_EQ(result, Root::make());
   EXPECT_EQ(ctx.log, "Root:entry ");
 }
 
+// Test: Start at child state A
 TEST(StateChartTest, StartAtA) {
   Context ctx;
-
   Root* result = Root::Start(A::make(), &ctx);
-
   EXPECT_EQ(result, A::make());
   EXPECT_EQ(ctx.log, "Root:entry A:entry ");
 }
 
+// Test: Start at grandchild state A1
 TEST(StateChartTest, StartAtA1) {
   Context ctx;
-
   Root* result = Root::Start(A1::make(), &ctx);
-
   EXPECT_EQ(result, A1::make());
   EXPECT_EQ(ctx.log, "Root:entry A:entry A1:entry ");
 }
 
+// Test: Start at B1
 TEST(StateChartTest, StartAtB1) {
   Context ctx;
-
   Root* result = Root::Start(B1::make(), &ctx);
-
   EXPECT_EQ(result, B1::make());
   EXPECT_EQ(ctx.log, "Root:entry B:entry B1:entry ");
 }
 
+// Test: stay() in event handler logs action
 TEST(StateChartTest, StayHandler) {
   Context ctx;
-
   Root* state = A1::make();
-  state = state->Dispatch( EvFoo{}, &ctx);
+  state = state->Dispatch(EvFoo{}, &ctx);
 
   EXPECT_EQ(state, A1::make());
   EXPECT_EQ(ctx.log, "A1:foo ");
 }
 
+// Test: defer() - event handled by parent
 TEST(StateChartTest, DeferHandler) {
   Context ctx;
-
   Root* state = A1::make();
-  state = state->Dispatch( EvBar{}, &ctx);
+  state = state->Dispatch(EvBar{}, &ctx);
 
+  // EvBar defers all the way to Root, which handles it with stay()
   EXPECT_EQ(state, Root::make());
 }
 
+// Test: Child state overrides parent's event handler
 TEST(StateChartTest, ChildOverridesParentEvent) {
   Context ctx;
-
   Root* state = A1::make();
-  state = state->Dispatch( EvBaz{}, &ctx);
+  state = state->Dispatch(EvBaz{}, &ctx);
 
+  // A1 handles EvBaz differently than A
   EXPECT_EQ(state, A2::make());
   EXPECT_EQ(ctx.log, "A1:baz A1:exit A2:entry ");
 }
 
+// Test: Parent handles event that child defers
 TEST(StateChartTest, ParentEventBaz) {
   Context ctx;
-
   Root* state = A::make();
-  state = state->Dispatch( EvBaz{}, &ctx);
+  state = state->Dispatch(EvBaz{}, &ctx);
 
+  // A handles EvBaz directly
   EXPECT_EQ(state, A::make());
   EXPECT_EQ(ctx.log, "A:baz ");
 }
 
+// ============================================================================
+// Second State Machine - Tests with struct events and switch
+// ============================================================================
+
+// Event containing a token and union data
 struct TokenEvent {
   enum class Token { FOO, BAR, BAZ, QUX } token;
   union {
@@ -293,10 +356,10 @@ struct TokenEvent {
 
 using Event2 = std::variant<TokenEvent>;
 
+// Second state machine: Machine -> S1, S2
 STATECHART(Machine, Event2, Context*);
 STATE(Machine, S1, Machine);
 STATE(Machine, S2, Machine);
-
 
 void Machine::Enter(Context* ctx) { ctx->log += "Machine:entry "; }
 void Machine::Exit(Context* ctx) { ctx->log += "Machine:exit "; }
@@ -305,6 +368,7 @@ void S1::Exit(Context* ctx) { ctx->log += "S1:exit "; }
 void S2::Enter(Context* ctx) { ctx->log += "S2:entry "; }
 void S2::Exit(Context* ctx) { ctx->log += "S2:exit "; }
 
+// Machine handler uses switch on token
 HANDLE_EVENT(Machine, Machine) {
   return Switch(event, [&](const TokenEvent& e) {
     switch (e.token) {
@@ -318,6 +382,7 @@ HANDLE_EVENT(Machine, Machine) {
   });
 }
 
+// S1 handler
 HANDLE_EVENT(Machine, S1) {
   return Switch(event, [&](const TokenEvent& e) {
     switch (e.token) {
@@ -330,6 +395,7 @@ HANDLE_EVENT(Machine, S1) {
   });
 }
 
+// S2 handler
 HANDLE_EVENT(Machine, S2) {
   return Switch(event, [&](const TokenEvent& e) {
     switch (e.token) {
@@ -341,6 +407,7 @@ HANDLE_EVENT(Machine, S2) {
   });
 }
 
+// Test: Using switch inside Switch for token-based events
 TEST(StateChartTest, SwitchOnVariantIndex) {
   Context ctx;
 
@@ -348,20 +415,22 @@ TEST(StateChartTest, SwitchOnVariantIndex) {
   EXPECT_EQ(state, S1::make());
   EXPECT_EQ(ctx.log, "Machine:entry S1:entry ");
 
-  // Skip the FOO dispatch for now, just test BAR
+  // BAR event transitions from S1 to S2 via Machine handler
   ctx.log.clear();
-  state = state->Dispatch( TokenEvent{TokenEvent::Token::BAR}, &ctx);
+  state = state->Dispatch(TokenEvent{TokenEvent::Token::BAR}, &ctx);
   EXPECT_EQ(state, S2::make());
   EXPECT_EQ(ctx.log, "S1:exit S2:entry ");
 }
 
+// Test: Struct event with token causes transition
 TEST(StateChartTest, SwitchWithStructEvent) {
   Context ctx;
 
   Machine* state = Machine::Start(S1::make(), &ctx);
 
+  // BAZ event handled by S1's handler
   ctx.log.clear();
-  state = state->Dispatch( TokenEvent{TokenEvent::Token::BAZ}, &ctx);
+  state = state->Dispatch(TokenEvent{TokenEvent::Token::BAZ}, &ctx);
   EXPECT_EQ(state, S2::make());
   EXPECT_EQ(ctx.log, "S1:baz S1:exit S2:entry ");
 }
