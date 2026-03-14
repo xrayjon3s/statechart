@@ -51,12 +51,11 @@ void B2::Enter(Context* ctx) { ctx->log += "B2:entry "; }
 void B2::Exit(Context* ctx) { ctx->log += "B2:exit "; }
 
 HANDLE_EVENT(Root, Root) {
-  return Root::Switch(
-      event, [&](EvFoo) { return stay(); }, [&](auto) { return stay(); });
+  return Switch(event, [&](EvFoo) { return stay(); }, [&](auto) { return stay(); });
 }
 
 HANDLE_EVENT(Root, A) {
-  return Root::Switch(
+  return Switch(
       event, [&](EvFoo) { return stay(); },
       [&](EvBaz) {
         ctx->log += "A:baz ";
@@ -66,7 +65,7 @@ HANDLE_EVENT(Root, A) {
 }
 
 HANDLE_EVENT(Root, A1) {
-  return Root::Switch(
+  return Switch(
       event,
       [&](EvFoo) {
         ctx->log += "A1:foo ";
@@ -80,25 +79,25 @@ HANDLE_EVENT(Root, A1) {
 }
 
 HANDLE_EVENT(Root, A2) {
-  return Root::Switch(
+  return Switch(
       event, [&](EvFoo) { return stay(); },
       [&](auto) { return defer(event, ctx); });
 }
 
 HANDLE_EVENT(Root, B) {
-  return Root::Switch(
+  return Switch(
       event, [&](EvFoo) { return stay(); },
       [&](auto) { return defer(event, ctx); });
 }
 
 HANDLE_EVENT(Root, B1) {
-  return Root::Switch(
+  return Switch(
       event, [&](EvFoo) { return stay(); },
       [&](auto) { return defer(event, ctx); });
 }
 
 HANDLE_EVENT(Root, B2) {
-  return Root::Switch(
+  return Switch(
       event, [&](EvFoo) { return stay(); },
       [&](auto) { return defer(event, ctx); });
 }
@@ -314,7 +313,7 @@ void S2::Enter(Context* ctx) { ctx->log += "S2:entry "; }
 void S2::Exit(Context* ctx) { ctx->log += "S2:exit "; }
 
 HANDLE_EVENT(Machine, Machine) {
-  return Machine::Switch(event, [&](const TokenEvent& e) {
+  return Switch(event, [&](const TokenEvent& e) {
     switch (e.token) {
       case TokenEvent::Token::FOO:
         return stay();
@@ -327,7 +326,7 @@ HANDLE_EVENT(Machine, Machine) {
 }
 
 HANDLE_EVENT(Machine, S1) {
-  return Machine::Switch(event, [&](const TokenEvent& e) {
+  return Switch(event, [&](const TokenEvent& e) {
     switch (e.token) {
       case TokenEvent::Token::BAZ:
         ctx->log += "S1:baz ";
@@ -339,7 +338,7 @@ HANDLE_EVENT(Machine, S1) {
 }
 
 HANDLE_EVENT(Machine, S2) {
-  return Machine::Switch(event, [&](const TokenEvent& e) {
+  return Switch(event, [&](const TokenEvent& e) {
     switch (e.token) {
       case TokenEvent::Token::QUX:
         return S1::make();

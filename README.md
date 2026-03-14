@@ -49,8 +49,8 @@ void A::Exit(Context* ctx) { /* ... */ }
 
 // Define event handlers
 HANDLE_EVENT(Root, Root) {
-  return Root::Switch(event, [&](EvFoo) { return stay(); },
-                      [&](auto) { return stay(); });
+  return Switch(event, [&](EvFoo) { return stay(); },
+               [&](auto) { return stay(); });
 }
 
 // Use it
