@@ -1,0 +1,18 @@
+{
+  "description": "Buy-the-dip screen: strong 1y and 5y performers, not overpriced, that have pulled back mostly because the market did.",
+  "rules": [
+    {"name": "strong_5y",      "expr": "cagr_5y >= idx_cagr_5y",
+     "why": "5-year annualized total return at or above its benchmark index"},
+    {"name": "strong_1y",      "expr": "ret_1y >= 0.10",
+     "why": "1-year total return of at least +10%"},
+    {"name": "pe_reasonable",  "expr": "pe_ttm > 0 and pe_ttm <= 35",
+     "why": "trailing P/E positive and no higher than 35"},
+    {"name": "pe_below_hist",  "expr": "pe_vs_hist <= 1.0",
+     "why": "trailing P/E at or below its own ~3-year median"},
+    {"name": "dipped",         "expr": "drawdown_52w <= -0.07 or ret_30d <= -0.03",
+     "why": "at least 7% below its 52-week high, or down 3%+ over 30 days"},
+    {"name": "market_driven",  "expr": "residual_30d >= -0.05",
+     "why": "30-day move not more than 5 pts worse than beta x index move (dip is mostly the market, not company news)"}
+  ],
+  "required": ["strong_5y", "strong_1y", "pe_reasonable"]
+}
