@@ -54,6 +54,13 @@ button { cursor: pointer; }
 button:hover, select:hover, input[type="search"]:hover { border-color: var(--muted); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .count { margin-left: auto; font: 12px var(--font-data); color: var(--muted); }
+.sliders { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 20px; }
+.slider { display: grid; gap: 4px; min-width: 0; }
+.slider .top { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; color: var(--muted); }
+.slider output { font: 500 13px var(--font-data); color: var(--fg); font-variant-numeric: tabular-nums; }
+.slider output.off { color: var(--muted); font-weight: 400; }
+.slider input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; }
+.slider .scale { display: flex; justify-content: space-between; font: 10px var(--font-data); color: var(--muted); }
 
 .stage { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; align-items: start; }
 @media (max-width: 860px) { .stage { grid-template-columns: minmax(0, 1fr); } }
@@ -109,6 +116,18 @@ footer { color: var(--muted); font-size: 12px; }
     <span class="count" id="count"></span>
   </div>
 
+  <div class="sliders" role="group" aria-label="Minimum return filters">
+    <div class="slider"><div class="top"><label for="min6">Minimum 6-month return</label><output id="min6o" for="min6"></output></div>
+      <input id="min6" type="range" min="-60" max="100" step="5" value="-60">
+      <div class="scale"><span>Any</span><span>0</span><span>+100%</span></div></div>
+    <div class="slider"><div class="top"><label for="min12">Minimum 1-year return</label><output id="min12o" for="min12"></output></div>
+      <input id="min12" type="range" min="-80" max="200" step="5" value="-80">
+      <div class="scale"><span>Any</span><span>0</span><span>+200%</span></div></div>
+    <div class="slider"><div class="top"><label for="min60">Minimum 5-year return</label><output id="min60o" for="min60"></output></div>
+      <input id="min60" type="range" min="-90" max="500" step="10" value="-90">
+      <div class="scale"><span>Any</span><span>0</span><span>+500%</span></div></div>
+  </div>
+
   <div class="stage">
     <div class="plot-box"><div id="plot" role="img" aria-label="3D chart of five-year performance for S&amp;P 500 companies ordered by P/E"></div>
       <div class="loading" id="loading">Loading 500 price histories…</div></div>
@@ -126,7 +145,7 @@ footer { color: var(--muted); font-size: 12px; }
   <div class="table-box">
     <table id="tbl"><thead><tr>
       <th data-k="rank">P/E rank</th><th data-k="s">Ticker</th><th data-k="n">Company</th><th data-k="sec">Sector</th>
-      <th data-k="pe">P/E</th><th data-k="fpe">Fwd P/E</th><th data-k="r1">1 yr</th><th data-k="g">5 yr</th><th data-k="dy">Yield</th>
+      <th data-k="pe">P/E</th><th data-k="fpe">Fwd P/E</th><th data-k="r6">6 mo</th><th data-k="r1">1 yr</th><th data-k="g">5 yr</th><th data-k="dy">Yield</th>
     </tr></thead><tbody></tbody></table>
   </div>
   <footer id="foot">Data: Yahoo Finance via the stock-screener skill. Trailing P/E uses GAAP diluted EPS; one-off charges can inflate it. Not investment advice.</footer>
@@ -160,6 +179,8 @@ footer { color: var(--muted); font-size: 12px; }
   for (const s of all) {
     const vals = s.v.filter((v) => v != null);
     s.g = vals[vals.length - 1] / vals[0] - 1;           // growth over the plotted window
+    const last = s.v.length - 1, back = s.v[last - 26];   // 26 weeks ~ 6 months
+    s.r6 = back != null && s.v[last] != null ? s.v[last] / back - 1 : null;
     s.short = s.since > dates[0];
   }
 
@@ -238,7 +259,10 @@ footer { color: var(--muted); font-size: 12px; }
   let focus = null;   // index into all
   function visibleMask() {
     const sec = $("sector").value, showLoss = $("losses").checked;
-    return all.map((s) => (!sec || s.sec === sec) && (showLoss || s.rank != null));
+    const passes = (val, id) => { const el = $(id); const t = +el.value / 100;
+      return +el.value <= +el.min || (val != null && val >= t); };   // slider at its minimum = no filter
+    return all.map((s) => (!sec || s.sec === sec) && (showLoss || s.rank != null)
+      && passes(s.r6, "min6") && passes(s.r1, "min12") && passes(s.g, "min60"));
   }
   function applyStyles() {
     const vis = visibleMask();
@@ -277,6 +301,7 @@ footer { color: var(--muted); font-size: 12px; }
         <dt>Forward P/E</dt><dd>${fmtNum(s.fpe)}</dd>
         <dt>P/E vs its 3-yr median</dt><dd>${s.pevh == null ? "–" : s.pevh.toFixed(2) + "×"}</dd>
         <dt>30 days</dt><dd class="${cls(s.r30)}">${fmtPct(s.r30, 1)}</dd>
+        <dt>6 months</dt><dd class="${cls(s.r6)}">${fmtPct(s.r6)}</dd>
         <dt>1 year</dt><dd class="${cls(s.r1)}">${fmtPct(s.r1)}</dd>
         <dt>${s.short ? "Since " + s.since.slice(0, 7) : "5 years"}</dt><dd class="${cls(s.g)}">${fmtPct(s.g)}</dd>
         <dt>S&amp;P 500, 5 yr</dt><dd>${fmtPct(spx.r5)}</dd>
@@ -296,9 +321,20 @@ footer { color: var(--muted); font-size: 12px; }
     if (i >= 0) setFocus(i); else if (!q) setFocus(null);
   });
   $("sector").addEventListener("change", applyStyles);
+  function showSlider(id) {
+    const el = $(id), o = $(id + "o"), off = +el.value <= +el.min;
+    o.textContent = off ? "any" : "≥ " + fmtPct(+el.value / 100);
+    o.classList.toggle("off", off);
+  }
+  let raf = 0;
+  for (const id of ["min6", "min12", "min60"]) {
+    showSlider(id);
+    $(id).addEventListener("input", () => { showSlider(id); cancelAnimationFrame(raf); raf = requestAnimationFrame(applyStyles); });
+  }
   $("losses").addEventListener("change", applyStyles);
   $("reset").addEventListener("click", () => {
     $("q").value = ""; $("sector").value = ""; $("losses").checked = true;
+    for (const id of ["min6", "min12", "min60"]) { $(id).value = $(id).min; showSlider(id); }
     Plotly.relayout(gd, { "scene.camera": DEFAULT_CAMERA });
     setFocus(null);
   });
@@ -317,7 +353,7 @@ footer { color: var(--muted); font-size: 12px; }
       <td>${s.rank ?? "–"}</td><td><span class="swatch" style="background:${colorFor(s.g)}"></span>${s.s}</td>
       <td class="name">${s.n.replace(/[<>&]/g, "")}</td><td class="name">${s.sec}</td>
       <td>${s.rank ? fmtNum(s.pe) : "–"}</td><td>${fmtNum(s.fpe)}</td>
-      <td class="${cls(s.r1)}">${fmtPct(s.r1)}</td><td class="${cls(s.g)}">${fmtPct(s.g)}${s.short ? "*" : ""}</td>
+      <td class="${cls(s.r6)}">${fmtPct(s.r6)}</td>      <td class="${cls(s.r1)}">${fmtPct(s.r1)}</td><td class="${cls(s.g)}">${fmtPct(s.g)}${s.short ? "*" : ""}</td>
       <td>${s.dy ? (s.dy * 100).toFixed(2) + "%" : "–"}</td></tr>`).join("");
     document.querySelectorAll("#tbl thead th").forEach((th) =>
       th.setAttribute("aria-sort", th.dataset.k === sortKey ? (sortDir > 0 ? "ascending" : "descending") : "none"));
