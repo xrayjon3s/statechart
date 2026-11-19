@@ -160,6 +160,8 @@ def compute(symbol: str, prices: pd.DataFrame, divs: pd.Series, meta: dict,
         row[f"corr5y_{isym}"] = c5
         if not math.isnan(c1) and c1 > best_c:
             best, best_c = isym, c1
+    if best is None:
+        raise ValueError(f"not enough price history from Yahoo ({len(adj)} days) to compare with an index")
     row["index"] = best
     row["index_name"] = INDEXES.get(best, "")
     row["corr_1y"] = best_c

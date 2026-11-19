@@ -1,0 +1,351 @@
+<meta charset="utf-8">
+<title>S&amp;P 500 P/E Stack</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a full-width instrument panel. Header + one control row, the 3D stack with a
+   readout column beside it (stacked on phones), then the same data as a sortable table. */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --fg: #14171c;
+  --muted: #59606e;
+  --rule: #dde1e8;
+  --accent: #2a78d6;
+  --gain-1: #2a78d6; --gain-2: #0d366b;
+  --loss-1: #e34948; --loss-2: #a32828;
+  --flat: #9b9aa0;
+  --font-display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101216; --surface: #171a1f; --fg: #eceef2; --muted: #a3a9b6; --rule: #2b3039;
+    --accent: #6da7ec;
+    --gain-1: #3987e5; --gain-2: #9ec5f4; --loss-1: #e66767; --loss-2: #f4a29c; --flat: #6f6e6a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101216; --surface: #171a1f; --fg: #eceef2; --muted: #a3a9b6; --rule: #2b3039;
+  --accent: #6da7ec;
+  --gain-1: #3987e5; --gain-2: #9ec5f4; --loss-1: #e66767; --loss-2: #f4a29c; --flat: #6f6e6a;
+  color-scheme: dark;
+}
+
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 14px; line-height: 1.45; }
+.wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+        padding-block: 20px 32px; max-width: 1480px; margin: 0 auto; display: grid; gap: 16px; }
+header { display: grid; gap: 4px; }
+.eyebrow { font: 500 11px/1 var(--font-data); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font: 600 clamp(24px, 3.2vw, 34px)/1.1 var(--font-display); margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+.lede { margin: 0; color: var(--muted); max-width: 72ch; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.controls label { font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+input[type="search"], select, button {
+  font: 500 13px var(--font-body); color: var(--fg); background: var(--surface);
+  border: 1px solid var(--rule); border-radius: 6px; padding: 6px 10px; min-height: 32px;
+}
+input[type="search"] { width: 9.5em; font-family: var(--font-data); text-transform: uppercase; }
+button { cursor: pointer; }
+button:hover, select:hover, input[type="search"]:hover { border-color: var(--muted); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.count { margin-left: auto; font: 12px var(--font-data); color: var(--muted); }
+
+.stage { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; align-items: start; }
+@media (max-width: 860px) { .stage { grid-template-columns: minmax(0, 1fr); } }
+.plot-box { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; min-width: 0; position: relative; }
+#plot { width: 100%; height: min(76vh, 780px); min-height: 420px; }
+.loading[hidden] { display: none; }
+.loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font: 13px var(--font-data); }
+
+.readout { display: grid; gap: 12px; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 14px; display: grid; gap: 10px; }
+.card h2 { font: 600 22px/1.1 var(--font-display); margin: 0; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.card h2 small { font: 400 13px var(--font-body); color: var(--muted); }
+.card .sub { color: var(--muted); font-size: 12px; margin-top: -6px; }
+dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; }
+dt { color: var(--muted); font-size: 12px; }
+dd { margin: 0; text-align: right; font: 500 13px var(--font-data); font-variant-numeric: tabular-nums; }
+.pos { color: var(--gain-1); } .neg { color: var(--loss-1); }
+.legend { display: grid; gap: 6px; }
+.legend .bar { height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--loss-2), var(--loss-1), var(--flat), var(--gain-1), var(--gain-2)); }
+.legend .ticks { display: flex; justify-content: space-between; font: 11px var(--font-data); color: var(--muted); }
+.hint { font-size: 12px; color: var(--muted); margin: 0; }
+
+.table-box { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; overflow: auto; max-height: 460px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 6px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--rule); }
+th:nth-child(-n+4), td:nth-child(-n+4) { text-align: left; }
+thead th { position: sticky; top: 0; background: var(--surface); font: 500 11px var(--font-data); letter-spacing: .06em;
+           text-transform: uppercase; color: var(--muted); cursor: pointer; user-select: none; }
+thead th[aria-sort="ascending"]::after { content: " ↑"; } thead th[aria-sort="descending"]::after { content: " ↓"; }
+td { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+td.name { font-family: var(--font-body); max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+tbody tr { cursor: pointer; }
+tbody tr:hover, tbody tr.on { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.swatch { display: inline-block; width: 10px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+footer { color: var(--muted); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow" id="asof">S&amp;P 500 · loading</div>
+    <h1>Five years of the S&amp;P 500, stacked by P/E</h1>
+    <p class="lede">Each line is one company: the value of $100 invested five years ago, dividends reinvested, on a log scale.
+      Lines are stacked front to back from the lowest trailing P/E to the highest; money-losing companies sit apart at the back.
+      Color shows the five-year result. Drag to rotate, scroll to zoom, hover a line for its ticker.</p>
+  </header>
+
+  <div class="controls" role="group" aria-label="Chart filters">
+    <label for="q">Find <input id="q" type="search" placeholder="Ticker" autocomplete="off" spellcheck="false"></label>
+    <label for="sector">Sector <select id="sector"><option value="">All sectors</option></select></label>
+    <label for="losses"><input id="losses" type="checkbox" checked> Show no-P/E companies</label>
+    <button id="reset" type="button">Reset view</button>
+    <span class="count" id="count"></span>
+  </div>
+
+  <div class="stage">
+    <div class="plot-box"><div id="plot" role="img" aria-label="3D chart of five-year performance for S&amp;P 500 companies ordered by P/E"></div>
+      <div class="loading" id="loading">Loading 500 price histories…</div></div>
+    <aside class="readout" aria-live="polite">
+      <div class="card" id="detail"></div>
+      <div class="card legend">
+        <div class="eyebrow">Line color · 5-year total return</div>
+        <div class="bar"></div>
+        <div class="ticks"><span>−80%</span><span>−50%</span><span>0</span><span>+100%</span><span>+400%</span></div>
+        <p class="hint">Companies listed less than five years ago are measured from their first week of trading.</p>
+      </div>
+    </aside>
+  </div>
+
+  <div class="table-box">
+    <table id="tbl"><thead><tr>
+      <th data-k="rank">P/E rank</th><th data-k="s">Ticker</th><th data-k="n">Company</th><th data-k="sec">Sector</th>
+      <th data-k="pe">P/E</th><th data-k="fpe">Fwd P/E</th><th data-k="r1">1 yr</th><th data-k="g">5 yr</th><th data-k="dy">Yield</th>
+    </tr></thead><tbody></tbody></table>
+  </div>
+  <footer id="foot">Data: Yahoo Finance via the stock-screener skill. Trailing P/E uses GAAP diluted EPS; one-off charges can inflate it. Not investment advice.</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"></script>
+<script>
+(async function () {
+  const $ = (id) => document.getElementById(id);
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const fmtPct = (x, d = 0) => x == null ? "–" : (x >= 0 ? "+" : "−") + Math.abs(x * 100).toFixed(d) + "%";
+  const fmtNum = (x, d = 1) => x == null ? "–" : x.toFixed(d);
+  const fmtCap = (x) => x == null ? "–" : x >= 1e12 ? "$" + (x / 1e12).toFixed(2) + "T" : "$" + (x / 1e9).toFixed(0) + "B";
+
+  let data;
+  try {
+    data = await (await fetch("data.json")).json();
+  } catch (e) {
+    $("loading").textContent = "Couldn't load data.json. Rebuild it with: python -m screener export-viz";
+    return;
+  }
+  const dates = data.dates;
+
+  // ---- order: positive P/E ascending, then no-P/E (losses) after a gap ----
+  const withPe = data.stocks.filter((s) => s.pe != null && s.pe > 0).sort((a, b) => a.pe - b.pe);
+  const noPe = data.stocks.filter((s) => !(s.pe != null && s.pe > 0)).sort((a, b) => a.s.localeCompare(b.s));
+  const GAP = 18;
+  withPe.forEach((s, i) => { s.rank = i + 1; s.z = i; });
+  noPe.forEach((s, i) => { s.rank = null; s.z = withPe.length + GAP + i; });
+  const all = [...withPe, ...noPe];
+  for (const s of all) {
+    const vals = s.v.filter((v) => v != null);
+    s.g = vals[vals.length - 1] / vals[0] - 1;           // growth over the plotted window
+    s.short = s.since > dates[0];
+  }
+
+  // ---- diverging color: log growth, ±1 at 5x / 0.2x ----
+  const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const mix = (a, b, t) => "rgb(" + a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(",") + ")";
+  function colorFor(g) {
+    const t = Math.max(-1, Math.min(1, Math.log(1 + g) / Math.log(5)));
+    const stops = [css("--loss-2"), css("--loss-1"), css("--flat"), css("--gain-1"), css("--gain-2")].map(hex);
+    const p = (t + 1) * 2, i = Math.min(3, Math.floor(p));
+    return mix(stops[i], stops[i + 1], p - i);
+  }
+
+  // ---- P/E tick labels on the depth axis ----
+  function peTicks() {
+    const vals = [], text = [];
+    for (const pe of [10, 15, 20, 25, 30, 40, 60, 100]) {
+      const i = withPe.findIndex((s) => s.pe >= pe);
+      if (i > 0) { vals.push(i); text.push("P/E " + pe); }
+    }
+    if (noPe.length) { vals.push(withPe.length + GAP + noPe.length / 2); text.push("No P/E"); }
+    return { vals, text };
+  }
+
+  // ---- traces: one per company so hover names the line ----
+  const sectors = [...new Set(all.map((s) => s.sec).filter(Boolean))].sort();
+  for (const sec of sectors) $("sector").add(new Option(sec, sec));
+
+  function hoverFor(s) {
+    const pe = s.rank ? `P/E ${fmtNum(s.pe)} (#${s.rank} of ${withPe.length})` : "No P/E (losing money)";
+    const since = s.short ? ` since ${s.since.slice(0, 7)}` : " 5 yr";
+    return `<b>${s.s}</b>  ${s.n.replace(/[<>&]/g, "")}<br>${pe}<br>${since.trim()}: ${fmtPct(s.g)}` +
+           `<br>%{x|%b %Y}: $%{z:.0f}<extra></extra>`;
+  }
+  const traces = all.map((s) => ({
+    type: "scatter3d", mode: "lines", name: s.s,
+    x: dates, y: new Array(dates.length).fill(s.z), z: s.v,
+    line: { color: colorFor(s.g), width: 2 }, opacity: 1,
+    hovertemplate: hoverFor(s), showlegend: false,
+  }));
+
+  function axisStyle(title, extra = {}) {
+    return Object.assign({
+      title: { text: title, font: { family: css("--font-body"), size: 12, color: css("--muted") } },
+      tickfont: { family: css("--font-data"), size: 10, color: css("--muted") },
+      gridcolor: css("--rule"), zerolinecolor: css("--rule"), linecolor: css("--rule"),
+      showbackground: false, showspikes: false,
+    }, extra);
+  }
+  const DEFAULT_CAMERA = { eye: { x: -0.55, y: -2.05, z: 0.85 }, up: { x: 0, y: 0, z: 1 }, center: { x: 0, y: 0.05, z: -0.15 } };
+  function layout() {
+    const t = peTicks();
+    return {
+      paper_bgcolor: css("--surface"), plot_bgcolor: css("--surface"),
+      margin: { l: 0, r: 0, t: 0, b: 0 },
+      font: { family: css("--font-body"), color: css("--fg") },
+      hoverlabel: { bgcolor: css("--surface"), bordercolor: css("--rule"),
+                    font: { family: css("--font-data"), size: 12, color: css("--fg") } },
+      scene: {
+        xaxis: axisStyle("", { type: "date", tickformat: "%Y", range: [dates[0], dates[dates.length - 1]] }),
+        yaxis: axisStyle("Trailing P/E (cheap in front)", { tickvals: t.vals, ticktext: t.text }),
+        zaxis: axisStyle("Value of $100 (log)", { type: "log", tickvals: [25, 50, 100, 200, 500, 1000, 2000],
+                                                 ticktext: ["$25", "$50", "$100", "$200", "$500", "$1k", "$2k"] }),
+        aspectmode: "manual", aspectratio: { x: 1.5, y: 1.9, z: 0.8 },
+        camera: DEFAULT_CAMERA,
+      },
+    };
+  }
+
+  const gd = $("plot");
+  await Plotly.newPlot(gd, traces, layout(), { responsive: true, displaylogo: false,
+    modeBarButtonsToRemove: ["resetCameraLastSave3d", "toImage"] });
+  $("loading").hidden = true;
+
+  // ---- state: highlight, filters ----
+  let focus = null;   // index into all
+  function visibleMask() {
+    const sec = $("sector").value, showLoss = $("losses").checked;
+    return all.map((s) => (!sec || s.sec === sec) && (showLoss || s.rank != null));
+  }
+  function applyStyles() {
+    const vis = visibleMask();
+    const op = all.map((_, i) => focus == null ? 1 : i === focus ? 1 : 0.12);
+    const w = all.map((_, i) => i === focus ? 7 : 2);
+    Plotly.restyle(gd, { visible: vis, opacity: op, "line.width": w });
+    $("count").textContent = `${vis.filter(Boolean).length} of ${all.length} companies`;
+    renderTable(vis);
+  }
+  function setFocus(i) {
+    focus = i;
+    applyStyles();
+    showDetail(i == null ? null : all[i]);
+    document.querySelectorAll("#tbl tbody tr").forEach((tr) => tr.classList.toggle("on", +tr.dataset.i === i));
+  }
+
+  function showDetail(s) {
+    const el = $("detail");
+    const spx = data.indexes["^GSPC"];
+    if (!s) {
+      const med = withPe[Math.floor(withPe.length / 2)].pe;
+      el.innerHTML = `<div class="eyebrow">Overview</div><h2>${all.length} companies</h2>
+        <dl><dt>Median P/E</dt><dd>${fmtNum(med)}</dd>
+        <dt>No P/E (losses)</dt><dd>${noPe.length}</dd>
+        <dt>S&amp;P 500, 5 yr</dt><dd class="${spx.r5 >= 0 ? "pos" : "neg"}">${fmtPct(spx.r5)}</dd>
+        <dt>Beat the index</dt><dd>${all.filter((s) => !s.short && s.g > spx.r5).length}</dd></dl>
+        <p class="hint">Hover a line to see its company here. Click a line or a table row to keep it highlighted; click again to clear.</p>`;
+      return;
+    }
+    const cls = (x) => x == null ? "" : x >= 0 ? "pos" : "neg";
+    el.innerHTML = `<div class="eyebrow">${s.sec || "—"}</div>
+      <h2>${s.s} <small>${s.n.replace(/[<>&]/g, "")}</small></h2>
+      <dl>
+        <dt>Trailing P/E</dt><dd>${s.rank ? fmtNum(s.pe) : "losses"}</dd>
+        <dt>P/E rank</dt><dd>${s.rank ? `${s.rank} of ${withPe.length}` : "–"}</dd>
+        <dt>Forward P/E</dt><dd>${fmtNum(s.fpe)}</dd>
+        <dt>P/E vs its 3-yr median</dt><dd>${s.pevh == null ? "–" : s.pevh.toFixed(2) + "×"}</dd>
+        <dt>30 days</dt><dd class="${cls(s.r30)}">${fmtPct(s.r30, 1)}</dd>
+        <dt>1 year</dt><dd class="${cls(s.r1)}">${fmtPct(s.r1)}</dd>
+        <dt>${s.short ? "Since " + s.since.slice(0, 7) : "5 years"}</dt><dd class="${cls(s.g)}">${fmtPct(s.g)}</dd>
+        <dt>S&amp;P 500, 5 yr</dt><dd>${fmtPct(spx.r5)}</dd>
+        <dt>Dividend yield</dt><dd>${s.dy ? (s.dy * 100).toFixed(2) + "%" : "–"}</dd>
+        <dt>Market cap</dt><dd>${fmtCap(s.cap)}</dd>
+        <dt>Beta vs ${s.idx === "^IXIC" ? "Nasdaq" : s.idx === "^DJI" ? "Dow" : "S&amp;P"}</dt><dd>${fmtNum(s.beta, 2)}</dd>
+      </dl>`;
+  }
+
+  gd.on("plotly_hover", (ev) => { const i = ev.points[0].curveNumber; if (i < all.length) showDetail(all[i]); });
+  gd.on("plotly_unhover", () => showDetail(focus == null ? null : all[focus]));
+  gd.on("plotly_click", (ev) => { const i = ev.points[0].curveNumber; setFocus(focus === i ? null : i); });
+
+  $("q").addEventListener("input", (e) => {
+    const q = e.target.value.trim().toUpperCase();
+    const i = q ? all.findIndex((s) => s.s === q) : -1;
+    if (i >= 0) setFocus(i); else if (!q) setFocus(null);
+  });
+  $("sector").addEventListener("change", applyStyles);
+  $("losses").addEventListener("change", applyStyles);
+  $("reset").addEventListener("click", () => {
+    $("q").value = ""; $("sector").value = ""; $("losses").checked = true;
+    Plotly.relayout(gd, { "scene.camera": DEFAULT_CAMERA });
+    setFocus(null);
+  });
+
+  // ---- table view ----
+  let sortKey = "rank", sortDir = 1;
+  function renderTable(vis = visibleMask()) {
+    const rows = all.map((s, i) => ({ s, i })).filter(({ i }) => vis[i]);
+    rows.sort((a, b) => {
+      let x = a.s[sortKey], y = b.s[sortKey];
+      if (x == null) return 1; if (y == null) return -1;
+      return (typeof x === "string" ? x.localeCompare(y) : x - y) * sortDir;
+    });
+    const cls = (x) => x == null ? "" : x >= 0 ? "pos" : "neg";
+    $("tbl").tBodies[0].innerHTML = rows.map(({ s, i }) => `<tr data-i="${i}" class="${i === focus ? "on" : ""}">
+      <td>${s.rank ?? "–"}</td><td><span class="swatch" style="background:${colorFor(s.g)}"></span>${s.s}</td>
+      <td class="name">${s.n.replace(/[<>&]/g, "")}</td><td class="name">${s.sec}</td>
+      <td>${s.rank ? fmtNum(s.pe) : "–"}</td><td>${fmtNum(s.fpe)}</td>
+      <td class="${cls(s.r1)}">${fmtPct(s.r1)}</td><td class="${cls(s.g)}">${fmtPct(s.g)}${s.short ? "*" : ""}</td>
+      <td>${s.dy ? (s.dy * 100).toFixed(2) + "%" : "–"}</td></tr>`).join("");
+    document.querySelectorAll("#tbl thead th").forEach((th) =>
+      th.setAttribute("aria-sort", th.dataset.k === sortKey ? (sortDir > 0 ? "ascending" : "descending") : "none"));
+  }
+  document.querySelector("#tbl thead").addEventListener("click", (e) => {
+    const k = e.target.closest("th")?.dataset.k; if (!k) return;
+    sortDir = k === sortKey ? -sortDir : (["rank", "s", "n", "sec", "pe", "fpe"].includes(k) ? 1 : -1);
+    sortKey = k; renderTable();
+  });
+  $("tbl").tBodies[0].addEventListener("click", (e) => {
+    const tr = e.target.closest("tr"); if (!tr) return;
+    const i = +tr.dataset.i; setFocus(focus === i ? null : i);
+  });
+
+  // ---- header + theme ----
+  const d = new Date(data.asOf + "T12:00:00");
+  $("asof").textContent = `S&P 500 · prices as of ${d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+  $("foot").textContent += ` * = listed less than five years ago.`;
+  function retheme() {
+    Plotly.relayout(gd, Object.assign(layout(), { "scene.camera": gd.layout.scene.camera }));
+    Plotly.restyle(gd, { "line.color": all.map((s) => colorFor(s.g)) });
+    document.querySelector(".legend .bar").style.background = "";
+    renderTable();
+  }
+  try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", retheme); } catch (e) {}
+  new MutationObserver(retheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  showDetail(null);
+  applyStyles();
+})();
+</script>

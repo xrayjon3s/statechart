@@ -6,12 +6,14 @@
   query   "<pandas expr>" [--sort COL] [--cols ...] [--csv]
   ticker  SYM
   columns
+  export-viz [OUT_DIR]
 """
 from __future__ import annotations
 
 import argparse
 import math
 import sys
+from pathlib import Path
 
 import pandas as pd
 
@@ -81,7 +83,7 @@ def main(argv: list[str] | None = None) -> None:
     r = sub.add_parser("refresh", help="fetch data and rebuild the snapshot")
     r.add_argument("--tickers", help="replace the universe with these tickers")
     r.add_argument("--add", help="add these tickers to the universe (exempt from --min-cap)")
-    r.add_argument("--universe", default="megacap")
+    r.add_argument("--universe", default="megacap", choices=["megacap", "sp500"])
     r.add_argument("--min-cap", type=float); r.add_argument("--force", action="store_true")
 
     for name in ("table", "query", "screen"):
@@ -95,7 +97,15 @@ def main(argv: list[str] | None = None) -> None:
 
     t = sub.add_parser("ticker"); t.add_argument("symbol")
     sub.add_parser("columns")
+    e = sub.add_parser("export-viz", help="write data.json for the charts in viz/")
+    e.add_argument("out_dir", nargs="?", default=str(Path(__file__).resolve().parent.parent / "viz"))
     a = p.parse_args(argv)
+
+    if a.cmd == "export-viz":
+        from .export import write_viz_data
+        out = write_viz_data(a.out_dir)
+        print(f"wrote {out} ({out.stat().st_size / 1024:.0f} KB)")
+        return
 
     if a.cmd == "refresh":
         syms = [x.strip().upper() for x in a.tickers.split(",")] if a.tickers else None
