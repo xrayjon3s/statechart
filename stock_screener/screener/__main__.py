@@ -1,6 +1,6 @@
 """CLI: python -m screener <command> ...
 
-  refresh [--tickers A,B] [--universe megacap] [--min-cap 2e11] [--force]
+  refresh [--tickers A,B | --add A,B] [--universe megacap] [--min-cap 2e11] [--force]
   table   [--sort COL] [--asc] [--cols preset|a,b,c] [--csv]
   screen  [--criteria FILE] [--all] [--csv]
   query   "<pandas expr>" [--sort COL] [--cols ...] [--csv]
@@ -79,7 +79,9 @@ def main(argv: list[str] | None = None) -> None:
     sub = p.add_subparsers(dest="cmd", required=True)
 
     r = sub.add_parser("refresh", help="fetch data and rebuild the snapshot")
-    r.add_argument("--tickers"); r.add_argument("--universe", default="megacap")
+    r.add_argument("--tickers", help="replace the universe with these tickers")
+    r.add_argument("--add", help="add these tickers to the universe (exempt from --min-cap)")
+    r.add_argument("--universe", default="megacap")
     r.add_argument("--min-cap", type=float); r.add_argument("--force", action="store_true")
 
     for name in ("table", "query", "screen"):
@@ -97,7 +99,9 @@ def main(argv: list[str] | None = None) -> None:
 
     if a.cmd == "refresh":
         syms = [x.strip().upper() for x in a.tickers.split(",")] if a.tickers else None
-        df = pipeline.build(syms, a.universe, a.min_cap, ttl=0 if a.force else pipeline.yahoo.DEFAULT_TTL)
+        extra = [x.strip().upper() for x in a.add.split(",")] if a.add else None
+        df = pipeline.build(syms, a.universe, a.min_cap, ttl=0 if a.force else pipeline.yahoo.DEFAULT_TTL,
+                            extra=extra)
         print(f"snapshot: {len(df)} tickers -> {pipeline.SNAPSHOT}")
         print(render(pipeline.load_indexes(), ["name", "price", "ret_30d", "ret_1y", "cagr_5y", "drawdown_52w"]))
         return

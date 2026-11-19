@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import time
 import urllib.parse
 import urllib.request
@@ -17,7 +18,21 @@ import pandas as pd
 
 BASE = "https://query1.finance.yahoo.com"
 UA = "Mozilla/5.0 (X11; Linux x86_64) stock-screener/0.1"
-CACHE_DIR = Path(__file__).resolve().parent.parent / "data" / "cache"
+
+
+def _data_dir() -> Path:
+    """$SCREENER_DATA_DIR, else <project>/data if writable (dev checkout), else ~/.cache/stock-screener
+    (installed skills may live in a read-only directory)."""
+    if os.environ.get("SCREENER_DATA_DIR"):
+        return Path(os.environ["SCREENER_DATA_DIR"]).expanduser()
+    project = Path(__file__).resolve().parent.parent
+    if os.access(project, os.W_OK):
+        return project / "data"
+    return Path.home() / ".cache" / "stock-screener"
+
+
+DATA_DIR = _data_dir()
+CACHE_DIR = DATA_DIR / "cache"
 DEFAULT_TTL = 12 * 3600  # seconds
 
 

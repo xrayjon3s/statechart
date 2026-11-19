@@ -12,13 +12,16 @@ import pandas as pd
 from . import metrics, yahoo
 from .universe import INDEXES, MEGACAP_MIN_CAP, UNIVERSES
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+DATA_DIR = yahoo.DATA_DIR
 SNAPSHOT = DATA_DIR / "snapshot.csv"
 INDEX_SNAPSHOT = DATA_DIR / "indexes.csv"
 
 
 def build(symbols: list[str] | None = None, universe: str = "megacap",
-          min_cap: float | None = None, ttl: int = yahoo.DEFAULT_TTL, workers: int = 8) -> pd.DataFrame:
+          min_cap: float | None = None, ttl: int = yahoo.DEFAULT_TTL, workers: int = 8,
+          extra: list[str] | None = None) -> pd.DataFrame:
+    """Build the snapshot. `extra` tickers are added to the universe and exempt from min_cap."""
+    extra = [s for s in (extra or [])]
     if symbols is None:
         symbols = UNIVERSES[universe]
         min_cap = MEGACAP_MIN_CAP if min_cap is None and universe == "megacap" else min_cap
@@ -39,14 +42,15 @@ def build(symbols: list[str] | None = None, universe: str = "megacap",
             print(f"warning: {sym}: {e}", file=sys.stderr)
             return None
 
+    symbols = list(dict.fromkeys([*symbols, *extra]))
     with ThreadPoolExecutor(workers) as ex:
         rows = [r for r in ex.map(one, symbols) if r]
     df = pd.DataFrame(rows).set_index("symbol")
     if min_cap:
-        df = df[df["market_cap"] >= min_cap]
+        df = df[(df["market_cap"] >= min_cap) | df.index.isin(extra)]
     df = df.sort_values("market_cap", ascending=False)
 
-    DATA_DIR.mkdir(exist_ok=True)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     df.to_csv(SNAPSHOT)
     pd.DataFrame(idx_rows.values()).set_index("symbol").to_csv(INDEX_SNAPSHOT)
     (DATA_DIR / "snapshot_meta.json").write_text(json.dumps(
