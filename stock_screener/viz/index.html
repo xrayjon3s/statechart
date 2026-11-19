@@ -239,6 +239,11 @@ footer { color: var(--muted); font-size: 12px; }
     }, extra);
   }
   let scale = "log";
+  function relayoutKeepCamera() {
+    const l = layout();
+    l.scene.camera = JSON.parse(JSON.stringify(gd.layout.scene.camera));
+    Plotly.relayout(gd, l);
+  }
   const DEFAULT_CAMERA = { eye: { x: -0.55, y: -2.05, z: 0.85 }, up: { x: 0, y: 0, z: 1 }, center: { x: 0, y: 0.05, z: -0.15 } };
   function layout() {
     const t = peTicks();
@@ -337,7 +342,7 @@ footer { color: var(--muted); font-size: 12px; }
     scale = next;
     $("scaleLog").setAttribute("aria-pressed", scale === "log");
     $("scaleLin").setAttribute("aria-pressed", scale === "linear");
-    Plotly.relayout(gd, Object.assign(layout(), { "scene.camera": gd.layout.scene.camera }));
+    relayoutKeepCamera();
   }
   $("scaleLog").addEventListener("click", () => setScale("log"));
   $("scaleLin").addEventListener("click", () => setScale("linear"));
@@ -394,7 +399,7 @@ footer { color: var(--muted); font-size: 12px; }
   $("asof").textContent = `S&P 500 · prices as of ${d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
   $("foot").textContent += ` * = listed less than five years ago.`;
   function retheme() {
-    Plotly.relayout(gd, Object.assign(layout(), { "scene.camera": gd.layout.scene.camera }));
+    relayoutKeepCamera();
     Plotly.restyle(gd, { "line.color": all.map((s) => colorFor(s.g)) });
     document.querySelector(".legend .bar").style.background = "";
     renderTable();
